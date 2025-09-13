@@ -3,8 +3,9 @@ import { h } from 'vue'
 import { FileText } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 
-// La 'Row' de nuestra tabla será cada objeto Movimiento ENRIQUECIDO
-export interface MovimientoEnriquecido {
+// --- INTERFAZ UNIFICADA ---
+// Asegúrate de que tenga 'export' para poder importarla en otros archivos
+export interface Movimiento {
   id: number
   created_at: string
   area_origen: { nombre: string }
@@ -20,6 +21,7 @@ export interface MovimientoEnriquecido {
   nro_folios: number
 }
 
+// --- HELPER PARA FECHAS ---
 const formatDate = (dateString: string) =>
   new Date(dateString).toLocaleString('es-ES', {
     day: '2-digit',
@@ -29,7 +31,8 @@ const formatDate = (dateString: string) =>
     minute: '2-digit',
   })
 
-export const columns: ColumnDef<MovimientoEnriquecido>[] = [
+// --- COLUMNAS ---
+export const columns: ColumnDef<Movimiento>[] = [
   {
     accessorKey: 'id',
     header: 'ID',
@@ -71,7 +74,7 @@ export const columns: ColumnDef<MovimientoEnriquecido>[] = [
     cell: ({ row }) => {
       const adjunto = row.getValue('archivo_adjunto') as string | null
       if (adjunto) {
-        // Asumiendo que tu backend está en localhost:8000
+        // Ajusta la URL base según tu backend
         const url = `http://127.0.0.1:8000/storage/${adjunto.replace('public/', '')}`
         return h(
           'a',

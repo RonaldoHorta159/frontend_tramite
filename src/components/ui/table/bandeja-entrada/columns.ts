@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { MoreHorizontal } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/authStore'
 
 // Helpers
 const formatDate = (dateString: string) =>
@@ -42,10 +43,13 @@ export interface DocumentoRecibido {
   tipo_documento: { nombre: string }
   asunto: string
   nro_folios: number
-  area_origen: { nombre: string }
+  area_origen: { id: number; nombre: string }
   archivo_pdf: string | null
   estado_general: string
   latestMovement: { proveido: string } | null
+  area_actual_id: number
+  respuesta_para_documento_id: number | null
+  fue_recibido_en_area_actual: boolean
 }
 
 export const columns: ColumnDef<DocumentoRecibido>[] = [
@@ -56,7 +60,21 @@ export const columns: ColumnDef<DocumentoRecibido>[] = [
       const meta = table.options.meta as {
         handleSeguimiento?: (documento: DocumentoRecibido) => void
         handleDerivar?: (documento: DocumentoRecibido) => void
+        handleOpenResponderModal?: (documento: DocumentoRecibido) => void
+        handleFinalizar?: (documento: DocumentoRecibido) => void
       }
+
+      const authStore = useAuthStore()
+      const accessibleAreaIds = [
+        ...(authStore.user?.areas.map((a) => a.id) || []),
+        authStore.user?.primary_area_id,
+      ]
+
+      // --- Lógica de visibilidad ---
+      const estaEnMiOficina = accessibleAreaIds.includes(doc.area_actual_id)
+      const noEstaFinalizado = doc.estado_general !== 'FINALIZADO'
+      const esProcesable =
+        estaEnMiOficina && noEstaFinalizado && doc.respuesta_para_documento_id === null
 
       return h(DropdownMenu, () => [
         h(DropdownMenuTrigger, { asChild: true }, () =>
@@ -66,13 +84,33 @@ export const columns: ColumnDef<DocumentoRecibido>[] = [
         ),
         h(DropdownMenuContent, { align: 'end' }, () => [
           h(DropdownMenuLabel, () => 'Opciones'),
-          // Ahora pasamos el objeto 'doc' completo
+
+          // Siempre disponible
           h(
             DropdownMenuItem,
             { onClick: () => meta.handleSeguimiento?.(doc) },
             () => 'Dar Seguimiento',
           ),
-          h(DropdownMenuItem, { onClick: () => meta.handleDerivar?.(doc) }, () => 'Derivar'),
+
+          // Opciones condicionales
+          esProcesable &&
+            h(DropdownMenuItem, { onClick: () => meta.handleDerivar?.(doc) }, () => 'Derivar'),
+
+          esProcesable &&
+            doc.fue_recibido_en_area_actual &&
+            h(
+              DropdownMenuItem,
+              { onClick: () => meta.handleOpenResponderModal?.(doc) },
+              () => 'Responder',
+            ),
+
+          esProcesable &&
+            doc.fue_recibido_en_area_actual &&
+            h(
+              DropdownMenuItem,
+              { class: 'text-red-600', onClick: () => meta.handleFinalizar?.(doc) },
+              () => 'Finalizar Trámite',
+            ),
         ]),
       ])
     },

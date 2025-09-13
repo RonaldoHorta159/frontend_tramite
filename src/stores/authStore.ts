@@ -1,12 +1,21 @@
 // src/stores/authStore.ts
 import { defineStore } from 'pinia'
-import apiClient from '@/services/api' // 1. Importa nuestro nuevo cliente de API
+import apiClient from '@/services/api'
 
-// ... (la interfaz User no cambia)
+// --- Definición del tipo Area ---
+interface Area {
+  id: number
+  nombre: string
+  // Puedes añadir más propiedades si son necesarias (ej: codigo)
+}
+
+// --- Interfaz User unificada ---
 interface User {
   id: number
   nombre_usuario: string
   rol: string
+  primary_area_id: number // ID de su oficina principal
+  areas: Area[] // Lista de oficinas/áreas permitidas
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -21,7 +30,6 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     async login(credentials: { nombre_usuario: string; password: string; remember?: boolean }) {
       try {
-        // 2. Usa el apiClient en lugar de axios directamente
         const response = await apiClient.post('/auth/login', credentials)
         const { access_token, user } = response.data
 
@@ -46,8 +54,6 @@ export const useAuthStore = defineStore('auth', {
       this.token = null
       localStorage.removeItem('token')
     },
-
-    // 3. NUEVA ACCIÓN para buscar el usuario si hay un token
     async fetchUser() {
       if (!this.token) return
 
@@ -56,7 +62,6 @@ export const useAuthStore = defineStore('auth', {
         this.user = response.data
       } catch (error) {
         console.error('Error al buscar el usuario:', error)
-        // Si el token es inválido o expiró, cerramos la sesión
         this.logout()
       }
     },

@@ -14,5 +14,7 @@ declare module '@tanstack/vue-table' {
     // --- FUNCIONES AÑADIDAS PARA LOS PANELES DE ADMIN ---
     openEditModal?: (data: TData) => void
     handleDeactivate?: (id: number) => void
+    handleOpenResponderModal?: (documento: DocumentoRecibido) => void
+    handleFinalizar?: (documento: DocumentoRecibido) => void
   }
 }

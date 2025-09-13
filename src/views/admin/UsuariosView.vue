@@ -44,8 +44,10 @@ const {
             Rellena los datos personales y de acceso.
           </DialogDescription>
         </DialogHeader>
+
         <form @submit.prevent="handleSubmit">
           <div class="grid grid-cols-2 gap-4 py-4">
+            <!-- Datos Personales -->
             <div><Label for="nombres">Nombres</Label><Input id="nombres" v-model="formData.nombres" /></div>
             <div><Label for="apellido_paterno">Apellido Paterno</Label><Input id="apellido_paterno"
                 v-model="formData.apellido_paterno" /></div>
@@ -56,23 +58,29 @@ const {
                 type="email" /></div>
 
             <div class="col-span-2">
-              <hr class="my-2">
+              <hr class="my-2" />
             </div>
 
-            <div><Label for="area">Área</Label>
-              <Select v-model="formData.area_id">
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccione un área" />
+            <!-- Datos de Usuario -->
+            <div>
+              <Label for="primary_area_id">Área Principal</Label>
+              <Select v-model="formData.primary_area_id">
+                <SelectTrigger id="primary_area_id">
+                  <SelectValue placeholder="Seleccione un área principal" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem v-for="area in areas" :key="area.id" :value="String(area.id)">{{ area.nombre }}
+                  <SelectItem v-for="area in areas" :key="area.id" :value="String(area.id)">
+                    {{ area.nombre }}
                   </SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
             <div><Label for="nombre_usuario">Nombre de Usuario</Label><Input id="nombre_usuario"
                 v-model="formData.nombre_usuario" /></div>
-            <div><Label for="rol">Rol</Label>
+
+            <div>
+              <Label for="rol">Rol</Label>
               <Select v-model="formData.rol">
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccione un rol" />
@@ -83,7 +91,9 @@ const {
                 </SelectContent>
               </Select>
             </div>
-            <div v-if="isEditing"><Label for="estado">Estado</Label>
+
+            <div v-if="isEditing">
+              <Label for="estado">Estado</Label>
               <Select v-model="formData.estado">
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccione estado" />
@@ -94,12 +104,31 @@ const {
                 </SelectContent>
               </Select>
             </div>
-            <div class="col-span-2"><Label for="password">Contraseña</Label><Input id="password"
-                v-model="formData.password" type="password"
-                :placeholder="isEditing ? 'Dejar en blanco para no cambiar' : ''" /></div>
-            <div class="col-span-2"><Label for="password_confirmation">Confirmar Contraseña</Label><Input
-                id="password_confirmation" v-model="formData.password_confirmation" type="password" /></div>
+
+            <div class="col-span-2">
+              <Label for="password">Contraseña</Label>
+              <Input id="password" v-model="formData.password" type="password"
+                :placeholder="isEditing ? 'Dejar en blanco para no cambiar' : ''" />
+            </div>
+
+            <div class="col-span-2">
+              <Label for="password_confirmation">Confirmar Contraseña</Label>
+              <Input id="password_confirmation" v-model="formData.password_confirmation" type="password" />
+            </div>
+
+            <!-- Áreas Asignadas Adicionales -->
+            <div class="col-span-2">
+              <Label>Áreas Asignadas Adicionales</Label>
+              <div class="p-4 border rounded-md max-h-48 overflow-y-auto mt-2 space-y-2">
+                <div v-for="area in areas" :key="area.id" class="flex items-center gap-2">
+                  <input type="checkbox" :id="`area-${area.id}`" :value="area.id" v-model="formData.areas_asignadas"
+                    class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                  <Label :for="`area-${area.id}`">{{ area.nombre }}</Label>
+                </div>
+              </div>
+            </div>
           </div>
+
           <DialogFooter>
             <Button type="submit">Guardar Cambios</Button>
           </DialogFooter>

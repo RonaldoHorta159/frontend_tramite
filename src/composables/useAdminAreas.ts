@@ -1,7 +1,12 @@
 // src/composables/useAdminAreas.ts
 
-import { ref, onMounted } from 'vue'
-import { useVueTable, getCoreRowModel, getFilteredRowModel } from '@tanstack/vue-table'
+import { ref, onMounted, watch } from 'vue'
+import {
+  useVueTable,
+  getCoreRowModel,
+  getPaginationRowModel,
+  type PaginationState,
+} from '@tanstack/vue-table'
 import { toast } from 'vue-sonner'
 import apiClient from '../services/api'
 import { columns, type Area } from '../components/ui/table/admin-areas/columns'
@@ -13,16 +18,22 @@ export function useAdminAreas() {
   const isEditing = ref(false)
   const areaToEdit = ref<Area | null>(null)
 
+  // --- Paginación ---
+  const pageCount = ref(0)
+  const pagination = ref<PaginationState>({ pageIndex: 0, pageSize: 15 })
+
   const formData = ref({
     nombre: '',
     estado: 'ACTIVO',
   })
 
+  // --- Fetch con paginación ---
   async function fetchAreas() {
     try {
       isLoading.value = true
-      const response = await apiClient.get('/admin/areas')
-      areas.value = response.data
+      const response = await apiClient.get(`/admin/areas?page=${pagination.value.pageIndex + 1}`)
+      areas.value = response.data.data
+      pageCount.value = response.data.last_page
     } catch (error) {
       toast.error('Error', { description: 'No se pudieron cargar las áreas.' })
     } finally {
@@ -30,6 +41,7 @@ export function useAdminAreas() {
     }
   }
 
+  watch(pagination, fetchAreas, { deep: true })
   onMounted(fetchAreas)
 
   function openCreateModal() {
@@ -63,11 +75,9 @@ export function useAdminAreas() {
 
     try {
       if (isEditing.value && areaToEdit.value) {
-        // Actualizar
         await apiClient.put(`/admin/areas/${areaToEdit.value.id}`, formData.value)
         toast.success('Éxito', { description: 'Área actualizada correctamente.' })
       } else {
-        // Crear
         await apiClient.post('/admin/areas', formData.value)
         toast.success('Éxito', { description: 'Área creada correctamente.' })
       }
@@ -86,6 +96,27 @@ export function useAdminAreas() {
       return columns
     },
     getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+
+    manualPagination: true,
+    get pageCount() {
+      return pageCount.value
+    },
+
+    state: {
+      get pagination() {
+        return pagination.value
+      },
+    },
+
+    onPaginationChange: (updater) => {
+      if (typeof updater === 'function') {
+        pagination.value = updater(pagination.value)
+      } else {
+        pagination.value = updater
+      }
+    },
+
     meta: {
       openEditModal,
       handleDeactivate,

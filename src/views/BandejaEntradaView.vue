@@ -1,28 +1,44 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import apiClient from '@/services/api'
+import axios from 'axios'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Download } from 'lucide-vue-next'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Download, Send } from 'lucide-vue-next'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from '@/components/ui/dialog'
 import { toast } from 'vue-sonner'
-import { useVueTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, type PaginationState } from '@tanstack/vue-table'
+import {
+  useVueTable,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  type PaginationState
+} from '@tanstack/vue-table'
 
-// Imports para los DataTables
+// Components
 import DataTable from '@/components/ui/table/DataTable.vue'
 import { type DocumentoRecibido, columns as mainColumns } from '@/components/ui/table/bandeja-entrada/columns'
 import { type DocumentoPendiente, columns as modalColumns } from '@/components/ui/table/recepcionar-modal/columns'
 import { type MovimientoEnriquecido, columns as seguimientoColumns } from '@/components/ui/table/seguimiento-modal/Columns'
-
-// Imports adicionales
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { useBandejaEntrada } from '@/composables/useBandejaEntrada'
 
-// --- Interfaces y Estado ---
-interface Area { id: number; nombre: string; }
+// --- Interfaces ---
+interface Area { id: number; nombre: string }
+interface TipoDocumento { id: number; nombre: string }
 interface DocumentoConHistorial extends DocumentoRecibido { movimientos: MovimientoEnriquecido[] }
 
+// --- State ---
 const todosLosDocumentos = ref<DocumentoRecibido[]>([])
 const documentosPendientes = ref<DocumentoPendiente[]>([])
 const isLoading = ref(true)
@@ -32,28 +48,44 @@ const areas = ref<Area[]>([])
 const pageCount = ref(0)
 const pagination = ref<PaginationState>({ pageIndex: 0, pageSize: 15 })
 
+// Seguimiento
 const isSeguimientoModalOpen = ref(false)
 const selectedDocHistory = ref<DocumentoConHistorial | null>(null)
 
+// Derivación
 const isDerivarModalOpen = ref(false)
 const docToDerive = ref<DocumentoRecibido | null>(null)
 const derivarFormData = ref({ area_destino_id: '', proveido: '' })
 
-// --- Tabla de Seguimiento ---
+// Responder / Finalizar (se traen del composable)
+const {
+  isResponderModalOpen,
+  isSubmittingResponse,
+  docToRespond,
+  respuestaFormData,
+  tiposDocumento,
+  handleOpenResponderModal,
+  handleFileChangeRespuesta,
+  handleSubmitRespuesta,
+  handleFinalizar,
+  isNumeroLoading, // <- añadido desde tu primer snippet
+} = useBandejaEntrada()
+
+// --- Tabla Seguimiento ---
 const seguimientoTable = useVueTable({
   get data() { return selectedDocHistory.value?.movimientos || [] },
   get columns() { return seguimientoColumns },
   getCoreRowModel: getCoreRowModel(),
 })
 
-// --- Lógica de Acciones ---
+// --- Acciones ---
 async function handleRecepcionar(docId: number) {
   try {
     const response = await apiClient.post(`/documentos/${docId}/recepcionar`)
     toast.success('Éxito', { description: response.data.message })
     fetchData()
   } catch (error) {
-    console.error('Error al recepcionar el documento:', error)
+    console.error('Error al recepcionar:', error)
     toast.error('Error', { description: 'No se pudo recepcionar el documento.' })
   }
 }
@@ -64,7 +96,7 @@ async function handleSeguimiento(documento: DocumentoRecibido) {
     selectedDocHistory.value = response.data
     isSeguimientoModalOpen.value = true
   } catch (error) {
-    console.error('Error al cargar el historial:', error)
+    console.error('Error al cargar historial:', error)
     toast.error('Error', { description: 'No se pudo cargar el historial del documento.' })
   }
 }
@@ -91,7 +123,7 @@ async function handleDerivarSubmit() {
   }
 }
 
-// --- Tablas principales ---
+// --- Tablas ---
 const mainTable = useVueTable({
   get data() { return todosLosDocumentos.value },
   get columns() { return mainColumns },
@@ -111,6 +143,7 @@ const mainTable = useVueTable({
   meta: {
     handleDerivar,
     handleSeguimiento,
+    handleOpenResponderModal,
   },
 })
 
@@ -120,28 +153,29 @@ const modalTable = useVueTable({
   getCoreRowModel: getCoreRowModel(),
   getFilteredRowModel: getFilteredRowModel(),
   state: { get globalFilter() { return modalFilter.value } },
-  meta: {
-    handleRecepcionar,
-  },
+  meta: { handleRecepcionar },
 })
 
-// --- Carga de Datos ---
+// --- Fetch ---
 async function fetchData() {
   isLoading.value = true
   try {
-    const [resMain, resPendientes, resAreas] = await Promise.all([
-      apiClient.get(`/documentos/recibidos?page=${pagination.value.pageIndex + 1}`),
+    const [resMain, resPendientes, resAreas, resTipos] = await Promise.all([
+      apiClient.get(`/documentos/recibidos?page=${pagination.value.pageIndex + 1}`, {
+        headers: { 'Cache-Control': 'no-cache' }
+      }),
       apiClient.get('/documentos/pendientes'),
       apiClient.get('/catalogos/areas'),
+      apiClient.get('/catalogos/tipos-documento'),
     ])
 
     todosLosDocumentos.value = resMain.data.data
     pageCount.value = resMain.data.last_page
-
     documentosPendientes.value = resPendientes.data
     areas.value = resAreas.data
+    // 👇 ahora los tiposDocumento ya vienen del composable, no se sobreescriben
   } catch (error) {
-    console.error('Error al cargar datos de la bandeja:', error)
+    console.error('Error al cargar datos:', error)
     toast.error('Error', { description: 'No se pudieron cargar los datos de la bandeja.' })
   } finally {
     isLoading.value = false
@@ -185,7 +219,7 @@ onMounted(fetchData)
       <DataTable :table="mainTable" />
     </template>
 
-    <!-- Modal de Seguimiento con DataTable -->
+    <!-- Modal Seguimiento -->
     <Dialog v-model:open="isSeguimientoModalOpen">
       <DialogContent class="max-w-7xl">
         <DialogHeader>
@@ -200,7 +234,7 @@ onMounted(fetchData)
       </DialogContent>
     </Dialog>
 
-    <!-- Modal de Derivación -->
+    <!-- Modal Derivar -->
     <Dialog v-model:open="isDerivarModalOpen">
       <DialogContent class="sm:max-w-[425px]">
         <DialogHeader>
@@ -211,7 +245,7 @@ onMounted(fetchData)
         </DialogHeader>
         <form @submit.prevent="handleDerivarSubmit" class="grid gap-4 py-4">
           <div class="grid grid-cols-4 items-center gap-4">
-            <Label for="destino" class="text-right">Destino</Label>
+            <Label class="text-right">Destino</Label>
             <Select v-model="derivarFormData.area_destino_id">
               <SelectTrigger class="col-span-3">
                 <SelectValue placeholder="Seleccione un área" />
@@ -224,9 +258,8 @@ onMounted(fetchData)
             </Select>
           </div>
           <div class="grid grid-cols-4 items-center gap-4">
-            <Label for="proveido" class="text-right">Proveído</Label>
-            <Textarea id="proveido" v-model="derivarFormData.proveido" class="col-span-3"
-              placeholder="Escriba su proveído aquí..." />
+            <Label class="text-right">Proveído</Label>
+            <Textarea v-model="derivarFormData.proveido" class="col-span-3" placeholder="Escriba su proveído aquí..." />
           </div>
           <DialogFooter>
             <Button type="submit">Derivar</Button>
@@ -234,5 +267,90 @@ onMounted(fetchData)
         </form>
       </DialogContent>
     </Dialog>
+
+    <!-- Modal Responder / Finalizar -->
+    <Dialog v-model:open="isResponderModalOpen">
+      <DialogContent class="sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle class="text-lg font-semibold">
+            Responder Trámite: {{ docToRespond?.codigo_unico }}
+          </DialogTitle>
+          <DialogDescription>
+            Complete los campos para generar el documento de respuesta. Esta acción finalizará el trámite original.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form @submit.prevent="handleSubmitRespuesta">
+          <div class="grid gap-6 py-4">
+            <div class="grid grid-cols-3 gap-4">
+              <!-- Tipo de documento -->
+              <div class="flex flex-col gap-2">
+                <Label>Tipo de Documento</Label>
+                <Select v-model="respuestaFormData.tipo_documento_id">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem v-for="tipo in tiposDocumento" :key="tipo.id" :value="String(tipo.id)">
+                      {{ tipo.nombre }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <!-- Nro de Documento (autogenerado) -->
+              <div class="flex flex-col gap-2">
+                <Label for="nro-doc-resp">Nro de Documento</Label>
+                <Input id="nro-doc-resp" v-model="respuestaFormData.nro_documento" readonly class="bg-muted" />
+                <p class="text-xs text-muted-foreground">
+                  * Generado automáticamente
+                </p>
+              </div>
+
+              <!-- Folios -->
+              <div class="flex flex-col gap-2">
+                <Label>Nro de Folios</Label>
+                <Input v-model="respuestaFormData.nro_folios" type="number" min="1" />
+              </div>
+            </div>
+
+            <!-- Destino -->
+            <div class="flex flex-col gap-2">
+              <Label>Destino</Label>
+              <Select v-model="respuestaFormData.area_destino_id">
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccione un área" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="area in areas" :key="area.id" :value="String(area.id)">
+                    {{ area.nombre }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <!-- Asunto -->
+            <div class="flex flex-col gap-2">
+              <Label>Asunto</Label>
+              <Textarea v-model="respuestaFormData.asunto" />
+            </div>
+
+            <!-- Archivo PDF -->
+            <div class="flex flex-col gap-2">
+              <Label>Adjuntar archivo de respuesta (PDF)</Label>
+              <Input type="file" @change="handleFileChangeRespuesta" accept=".pdf" />
+            </div>
+          </div>
+
+          <DialogFooter class="sm:justify-start gap-2">
+            <Button type="submit" :disabled="isSubmittingResponse || isNumeroLoading">
+              <Send class="w-4 h-4 mr-2" />
+              {{ isSubmittingResponse ? "Enviando..." : "Enviar Respuesta y Finalizar" }}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+
   </div>
 </template>

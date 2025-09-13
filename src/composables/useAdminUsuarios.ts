@@ -1,11 +1,16 @@
-import { ref, onMounted } from 'vue'
-import { useVueTable, getCoreRowModel, getFilteredRowModel } from '@tanstack/vue-table'
+import { ref, onMounted, watch } from 'vue'
+import {
+  useVueTable,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  type PaginationState,
+} from '@tanstack/vue-table'
 import { toast } from 'vue-sonner'
 import apiClient from '@/services/api'
 import axios from 'axios'
 import { columns, type Usuario } from '../components/ui/table/admin-usuarios/Columns'
 
-// Definimos la interfaz aquí para no importarla desde una vista
 interface Area {
   id: number
   nombre: string
@@ -21,28 +26,39 @@ export function useAdminUsuarios() {
   const userToEdit = ref<Usuario | null>(null)
   const globalFilter = ref('')
 
+  // --- Estados para la paginación ---
+  const pageCount = ref(0)
+  const pagination = ref<PaginationState>({ pageIndex: 0, pageSize: 10 })
+
+  // --- CORREGIDO: usamos primary_area_id ---
   const formData = ref({
     nombres: '',
     apellido_paterno: '',
     apellido_materno: '',
     dni: '',
     email: '',
-    area_id: '',
+    primary_area_id: '', // antes era area_id
     nombre_usuario: '',
     rol: 'Usuario',
     estado: 'ACTIVO',
     password: '',
     password_confirmation: '',
+    areas_asignadas: [] as number[],
   })
 
+  // --- Obtener usuarios y áreas ---
   async function fetchUsuarios() {
     try {
       isLoading.value = true
       const [resUsuarios, resAreas] = await Promise.all([
-        apiClient.get('/admin/usuarios'),
+        apiClient.get(`/admin/usuarios?page=${pagination.value.pageIndex + 1}`, {
+          headers: { 'Cache-Control': 'no-cache' },
+        }),
         apiClient.get('/catalogos/areas'),
       ])
-      usuarios.value = resUsuarios.data
+
+      usuarios.value = resUsuarios.data.data
+      pageCount.value = resUsuarios.data.last_page
       areas.value = resAreas.data
     } catch (error) {
       console.error('Error al cargar datos:', error)
@@ -52,27 +68,30 @@ export function useAdminUsuarios() {
     }
   }
 
+  watch(pagination, fetchUsuarios, { deep: true })
   onMounted(fetchUsuarios)
 
+  // --- Abrir modal para crear ---
   function openCreateModal() {
     isEditing.value = false
-    // Reseteamos el formulario a sus valores por defecto
     formData.value = {
       nombres: '',
       apellido_paterno: '',
       apellido_materno: '',
       dni: '',
       email: '',
-      area_id: '',
+      primary_area_id: '',
       nombre_usuario: '',
       rol: 'Usuario',
       estado: 'ACTIVO',
       password: '',
       password_confirmation: '',
+      areas_asignadas: [],
     }
     isModalOpen.value = true
   }
 
+  // --- Abrir modal para editar ---
   function openEditModal(user: Usuario) {
     isEditing.value = true
     userToEdit.value = user
@@ -82,16 +101,18 @@ export function useAdminUsuarios() {
       apellido_materno: user.empleado.apellido_materno,
       dni: user.empleado.dni,
       email: user.empleado.email,
-      area_id: String(user.area.id),
+      primary_area_id: String(user.primary_area_id), // corregido
       nombre_usuario: user.nombre_usuario,
       rol: user.rol,
       estado: user.estado,
       password: '',
       password_confirmation: '',
+      areas_asignadas: user.areas.map((area) => area.id), // soporta múltiples áreas
     }
     isModalOpen.value = true
   }
 
+  // --- Desactivar usuario ---
   async function handleDeactivate(userId: number) {
     try {
       await apiClient.delete(`/admin/usuarios/${userId}`)
@@ -103,36 +124,38 @@ export function useAdminUsuarios() {
     }
   }
 
+  // --- Crear o actualizar usuario ---
   async function handleSubmit() {
+    console.log('Iniciando guardado. ¿Modo edición?', isEditing.value)
+
     try {
       const payload = { ...formData.value }
+
       if (isEditing.value && userToEdit.value) {
         if (!payload.password) {
-          // --- CORRECCIÓN AQUÍ ---
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           delete (payload as any).password
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           delete (payload as any).password_confirmation
-          // -----------------------
         }
         await apiClient.put(`/admin/usuarios/${userToEdit.value.id}`, payload)
-        toast.success('Éxito', { description: 'Usuario actualizado.' })
+        toast.success('Éxito', { description: 'Usuario actualizado correctamente.' })
       } else {
         await apiClient.post('/admin/usuarios', payload)
-        toast.success('Éxito', { description: 'Usuario creado.' })
+        toast.success('Éxito', { description: 'Usuario creado correctamente.' })
       }
+
       isModalOpen.value = false
-      fetchUsuarios()
+      await fetchUsuarios()
     } catch (error) {
       console.error('Error al guardar usuario:', error)
       let errorMsg = 'No se pudo guardar el usuario.'
-      if (axios.isAxiosError(error) && error.response) {
-        errorMsg = Object.values(error.response.data.errors).join(' \n')
+      if (axios.isAxiosError(error) && error.response && error.response.data.errors) {
+        errorMsg = Object.values(error.response.data.errors).flat().join(' ')
       }
-      toast.error('Error', { description: errorMsg })
+      toast.error('Error de Validación', { description: errorMsg })
     }
   }
 
+  // --- Configuración de la tabla con paginación ---
   const table = useVueTable({
     get data() {
       return usuarios.value
@@ -142,11 +165,30 @@ export function useAdminUsuarios() {
     },
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+
+    manualPagination: true,
+    get pageCount() {
+      return pageCount.value
+    },
+
     state: {
       get globalFilter() {
         return globalFilter.value
       },
+      get pagination() {
+        return pagination.value
+      },
     },
+
+    onPaginationChange: (updater) => {
+      if (typeof updater === 'function') {
+        pagination.value = updater(pagination.value)
+      } else {
+        pagination.value = updater
+      }
+    },
+
     meta: { openEditModal, handleDeactivate },
   })
 
