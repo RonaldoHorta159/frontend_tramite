@@ -47,14 +47,6 @@ const formatDate = (dateString: string) =>
 
 export const columns: ColumnDef<Usuario>[] = [
   {
-    accessorKey: 'empleado.nombres',
-    header: 'Nombre Completo',
-    cell: ({ row }) => {
-      const emp = row.original.empleado
-      return h('div', `${emp.nombres} ${emp.apellido_paterno} ${emp.apellido_materno}`)
-    },
-  },
-  {
     id: 'opciones',
     cell: ({ row, table }) => {
       const usuario = row.original

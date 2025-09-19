@@ -22,6 +22,7 @@ const {
   tiposDocumento,
   areas,
   newDoc,
+  validationErrors,
   handleFileChange,
   resetForm,
   handleCreateDocument,
@@ -49,7 +50,7 @@ const {
       <!-- Botón nuevo trámite: solo usuarios normales -->
       <Dialog v-model:open="isModalOpen">
         <DialogTrigger as-child>
-          <Button class="mr-30">Nuevo Trámite</Button>
+          <Button>Nuevo Trámite</Button>
         </DialogTrigger>
         <DialogContent class="sm:max-w-3xl">
           <DialogHeader>
@@ -58,7 +59,6 @@ const {
           </DialogHeader>
           <form @submit.prevent="handleCreateDocument">
             <div class="grid gap-6 py-4">
-              <!-- Tipo de doc / nro doc / folios -->
               <div class="grid grid-cols-3 gap-4">
                 <div class="flex flex-col gap-2">
                   <Label for="tipo-doc">Tipo de Documento</Label>
@@ -72,7 +72,11 @@ const {
                       </SelectItem>
                     </SelectContent>
                   </Select>
+                  <p v-if="validationErrors.tipo_documento_id" class="text-sm text-red-500">
+                    {{ validationErrors.tipo_documento_id[0] }}
+                  </p>
                 </div>
+
                 <div class="flex flex-col gap-2">
                   <Label for="nro-doc">Nro de Documento</Label>
                   <Input id="nro-doc" v-model="newDoc.nro_documento" readonly class="bg-muted" />
@@ -81,10 +85,12 @@ const {
                 <div class="flex flex-col gap-2">
                   <Label for="nro-folios">Nro de Folios</Label>
                   <Input id="nro-folios" v-model="newDoc.nro_folios" type="number" min="1" />
+                  <p v-if="validationErrors.nro_folios" class="text-sm text-red-500">
+                    {{ validationErrors.nro_folios[0] }}
+                  </p>
                 </div>
               </div>
 
-              <!-- Destino -->
               <div class="flex flex-col gap-2">
                 <Label for="destino">Destino</Label>
                 <Select v-model="newDoc.area_destino_id">
@@ -97,18 +103,25 @@ const {
                     </SelectItem>
                   </SelectContent>
                 </Select>
+                <p v-if="validationErrors.area_destino_id" class="text-sm text-red-500">
+                  {{ validationErrors.area_destino_id[0] }}
+                </p>
               </div>
 
-              <!-- Asunto -->
               <div class="flex flex-col gap-2">
                 <Label for="asunto">Asunto</Label>
                 <Textarea id="asunto" v-model="newDoc.asunto" placeholder="Escriba el asunto del documento..." />
+                <p v-if="validationErrors.asunto" class="text-sm text-red-500">
+                  {{ validationErrors.asunto[0] }}
+                </p>
               </div>
 
-              <!-- Archivo -->
               <div class="flex flex-col gap-2">
                 <Label for="archivo">Adjuntar archivo en PDF</Label>
                 <Input id="archivo" type="file" @change="handleFileChange" accept=".pdf" />
+                <p v-if="validationErrors.archivo_pdf" class="text-sm text-red-500">
+                  {{ validationErrors.archivo_pdf[0] }}
+                </p>
               </div>
             </div>
 

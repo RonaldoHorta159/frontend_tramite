@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import logoTramusa from '../../public/fondo-login.png'
+
 // Ya no necesitamos importar el Checkbox de shadcn/vue, usamos el nativo
 import { toast } from 'vue-sonner'
 
@@ -56,7 +58,7 @@ console.log("archivo 47372011")
 <template>
   <div class="w-full h-screen overflow-hidden lg:grid lg:grid-cols-2">
     <div class="hidden lg:block bg-cover bg-center dark:brightness-[0.4]"
-      :style="{ backgroundImage: `url('/src/assets/images/fondo-login.webp')` }"></div>
+      :style="{ backgroundImage: `url(${logoTramusa})` }"></div>
 
     <div class="flex items-center justify-center py-12">
       <div class="mx-auto grid w-[350px] gap-6">

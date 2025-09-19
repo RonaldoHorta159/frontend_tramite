@@ -56,43 +56,43 @@ onMounted(async () => {
 
 <template>
   <div class="flex flex-col gap-6">
-    <h1 class="text-3xl font-bold">Dashboard</h1>
 
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       <Card>
         <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle class="text-sm font-medium">Documentos Enviados</CardTitle>
+          <CardTitle class="text-sm font-medium">Enviados</CardTitle>
           <Send class="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div class="text-2xl font-bold">{{ totalEnviados }}</div>
-          <p class="text-xs text-muted-foreground">Total de trámites que has iniciado</p>
+          <p class="text-sm text-muted-foreground">Total de trámites que has iniciado</p>
         </CardContent>
       </Card>
       <Card>
         <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle class="text-sm font-medium">En Bandeja de Entrada</CardTitle>
+          <CardTitle class="text-sm font-medium">Bandeja de Entrada</CardTitle>
           <Inbox class="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div class="text-2xl font-bold">{{ totalEnBandeja }}</div>
-          <p class="text-xs text-muted-foreground">Documentos pendientes de recepción</p>
+          <p class="text-sm text-muted-foreground">Documentos pendientes de recepción</p>
         </CardContent>
       </Card>
       <Card>
         <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle class="text-sm font-medium">Documentos Finalizados</CardTitle>
+          <CardTitle class="text-sm font-medium">Finalizados</CardTitle>
           <FileText class="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div class="text-2xl font-bold">{{ totalFinalizados }}</div>
-          <p class="text-xs text-muted-foreground">Trámites completados en tu gestión</p>
+          <p class="text-sm text-muted-foreground">Trámites completados en tu gestión</p>
         </CardContent>
       </Card>
     </div>
 
     <div>
-      <h2 class="text-xl font-semibold mb-4">Seguimiento del Último Trámite</h2>
+      <h2 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight transition-colors first:mt-0">Último
+        Trámite</h2>
       <template v-if="isLoading">
         <div class="text-center py-10 text-muted-foreground">Cargando seguimiento...</div>
       </template>

@@ -20,7 +20,10 @@ import {
   columns as modalColumns,
   type DocumentoPendiente,
 } from '../components/ui/table/recepcionar-modal/columns'
-import { type Movimiento } from '../components/ui/table/seguimiento-modal/Columns'
+import {
+  type Movimiento,
+  columns as seguimientoColumns,
+} from '../components/ui/table/seguimiento-modal/Columns'
 
 // --- Tipos ---
 interface Area {
@@ -65,17 +68,16 @@ export function useBandejaEntrada() {
   const isSubmittingResponse = ref(false)
   const docToRespond = ref<DocumentoRecibido | null>(null)
 
-  // Formulario con nro_documento incluido
   const respuestaFormData = ref({
     tipo_documento_id: '',
-    nro_documento: '', // <-- añadido
+    nro_documento: '',
     asunto: '',
     nro_folios: 1,
     area_destino_id: '',
     archivo_pdf: null as File | null,
   })
 
-  // --- Watcher para cargar el número correlativo al abrir el modal ---
+  // --- Watcher para correlativo ---
   watch(isResponderModalOpen, async (newValue) => {
     if (newValue === true && docToRespond.value) {
       isNumeroLoading.value = true
@@ -145,12 +147,11 @@ export function useBandejaEntrada() {
     }
   }
 
-  // --- Funciones de Respuesta ---
   function handleOpenResponderModal(documento: DocumentoRecibido) {
     docToRespond.value = documento
     respuestaFormData.value = {
       tipo_documento_id: '',
-      nro_documento: '', // se llena por watcher
+      nro_documento: '',
       asunto: `RESPUESTA A ${documento.codigo_unico}`,
       nro_folios: 1,
       area_destino_id: String(documento.area_origen.id),
@@ -194,24 +195,6 @@ export function useBandejaEntrada() {
     }
   }
 
-  // --- Finalizar ---
-  async function handleFinalizar(documento: DocumentoRecibido) {
-    if (
-      confirm(
-        `¿Estás seguro de que deseas finalizar el trámite ${documento.codigo_unico}? Esta acción no se puede deshacer.`,
-      )
-    ) {
-      try {
-        const response = await apiClient.post(`/documentos/${documento.id}/finalizar`)
-        toast.success('Éxito', { description: response.data.message })
-        await fetchData()
-      } catch (error) {
-        console.error('Error al finalizar:', error)
-        toast.error('Error', { description: 'No se pudo finalizar el trámite.' })
-      }
-    }
-  }
-
   // --- Tablas ---
   const mainTable = useVueTable({
     get data() {
@@ -223,12 +206,10 @@ export function useBandejaEntrada() {
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-
     manualPagination: true,
     get pageCount() {
       return pageCount.value
     },
-
     state: {
       get globalFilter() {
         return mainFilter.value
@@ -237,16 +218,13 @@ export function useBandejaEntrada() {
         return pagination.value
       },
     },
-
     onPaginationChange: (updater) => {
       pagination.value = typeof updater === 'function' ? updater(pagination.value) : updater
     },
-
     meta: {
       handleDerivar,
       handleSeguimiento,
       handleOpenResponderModal,
-      handleFinalizar,
     },
   })
 
@@ -269,6 +247,16 @@ export function useBandejaEntrada() {
     },
   })
 
+  const seguimientoTable = useVueTable({
+    get data() {
+      return selectedDocHistory.value?.movimientos || []
+    },
+    get columns() {
+      return seguimientoColumns
+    },
+    getCoreRowModel: getCoreRowModel(),
+  })
+
   // --- Carga de Datos ---
   async function fetchData() {
     isLoading.value = true
@@ -286,7 +274,6 @@ export function useBandejaEntrada() {
 
       todosLosDocumentos.value = resMain.data.data
       pageCount.value = resMain.data.last_page
-
       documentosPendientes.value = resPendientes.data
       areas.value = resAreas.data
       tiposDocumento.value = resTipos.data
@@ -298,15 +285,20 @@ export function useBandejaEntrada() {
     }
   }
 
-  // --- Nueva lógica de carga inicial ---
+  // --- Watchers ---
   watch(
     () => authStore.user,
     (newUser) => {
-      if (newUser) {
-        fetchData()
-      }
+      if (newUser) fetchData()
     },
     { immediate: true },
+  )
+  watch(
+    pagination,
+    (newPagination, oldPagination) => {
+      if (authStore.user && newPagination.pageIndex !== oldPagination.pageIndex) fetchData()
+    },
+    { deep: true },
   )
 
   watch(
@@ -325,11 +317,14 @@ export function useBandejaEntrada() {
     isLoading,
     mainFilter,
     modalFilter,
-    mainTable,
-    modalTable,
     documentosPendientes,
     areas,
     tiposDocumento,
+
+    // Tablas
+    mainTable,
+    modalTable,
+    seguimientoTable,
 
     // Modales
     isSeguimientoModalOpen,
@@ -352,6 +347,5 @@ export function useBandejaEntrada() {
     handleOpenResponderModal,
     handleFileChangeRespuesta,
     handleSubmitRespuesta,
-    handleFinalizar,
   }
 }

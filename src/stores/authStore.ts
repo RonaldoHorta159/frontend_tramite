@@ -6,7 +6,7 @@ import apiClient from '@/services/api'
 interface Area {
   id: number
   nombre: string
-  // Puedes añadir más propiedades si son necesarias (ej: codigo)
+  codigo?: string
 }
 
 // --- Interfaz User unificada ---
@@ -14,8 +14,9 @@ interface User {
   id: number
   nombre_usuario: string
   rol: string
-  primary_area_id: number // ID de su oficina principal
-  areas: Area[] // Lista de oficinas/áreas permitidas
+  primary_area_id: number
+  primary_area: Area // <-- Aceptamos el objeto completo del área principal
+  areas: Area[] // Lista de otras áreas permitidas
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -31,17 +32,23 @@ export const useAuthStore = defineStore('auth', {
     async login(credentials: { nombre_usuario: string; password: string; remember?: boolean }) {
       try {
         const response = await apiClient.post('/auth/login', credentials)
-        const { access_token, user } = response.data
+        const { access_token } = response.data
 
         this.token = access_token
-        this.user = user
         localStorage.setItem('token', access_token)
 
+        // ¡CAMBIO CLAVE!
+        // Inmediatamente después de guardar el token, llama a fetchUser
+        // para obtener los datos completos del usuario.
+        await this.fetchUser() // [!code ++]
+
+        // ... lógica de 'remember' ...
         if (credentials.remember) {
           localStorage.setItem('rememberedUser', credentials.nombre_usuario)
         } else {
           localStorage.removeItem('rememberedUser')
         }
+
         return true
       } catch (error) {
         console.error('Error en el login:', error)
@@ -49,11 +56,13 @@ export const useAuthStore = defineStore('auth', {
         return false
       }
     },
+
     logout() {
       this.user = null
       this.token = null
       localStorage.removeItem('token')
     },
+
     async fetchUser() {
       if (!this.token) return
 

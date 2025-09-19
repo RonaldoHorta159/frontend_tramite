@@ -61,7 +61,7 @@ export const columns: ColumnDef<DocumentoRecibido>[] = [
         handleSeguimiento?: (documento: DocumentoRecibido) => void
         handleDerivar?: (documento: DocumentoRecibido) => void
         handleOpenResponderModal?: (documento: DocumentoRecibido) => void
-        handleFinalizar?: (documento: DocumentoRecibido) => void
+        // 🔴 handleFinalizar eliminado
       }
 
       const authStore = useAuthStore()
@@ -96,20 +96,13 @@ export const columns: ColumnDef<DocumentoRecibido>[] = [
           esProcesable &&
             h(DropdownMenuItem, { onClick: () => meta.handleDerivar?.(doc) }, () => 'Derivar'),
 
+          // 🔴 Ahora unificamos en "Responder y Finalizar"
           esProcesable &&
             doc.fue_recibido_en_area_actual &&
             h(
               DropdownMenuItem,
               { onClick: () => meta.handleOpenResponderModal?.(doc) },
-              () => 'Responder',
-            ),
-
-          esProcesable &&
-            doc.fue_recibido_en_area_actual &&
-            h(
-              DropdownMenuItem,
-              { class: 'text-red-600', onClick: () => meta.handleFinalizar?.(doc) },
-              () => 'Finalizar Trámite',
+              () => 'Responder y Finalizar',
             ),
         ]),
       ])

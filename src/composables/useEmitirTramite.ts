@@ -74,6 +74,8 @@ export function useEmitirTramite() {
     archivo_pdf: null as File | null,
   })
 
+  const validationErrors = ref<Record<string, string[]>>({})
+
   const isSeguimientoModalOpen = ref(false)
   const selectedDocHistory = ref<DocumentoConHistorial | null>(null)
   const isDerivarModalOpen = ref(false)
@@ -169,11 +171,17 @@ export function useEmitirTramite() {
       area_destino_id: '',
       archivo_pdf: null,
     }
+    validationErrors.value = {} // <-- AÑADIMOS ESTA LÍNEA para limpiar los errores también
     const fileInput = document.getElementById('archivo') as HTMLInputElement
     if (fileInput) fileInput.value = ''
   }
 
+  // Reemplaza la función handleCreateDocument() original por esta:
   async function handleCreateDocument() {
+    // Primero, limpiamos cualquier error de un intento anterior
+    validationErrors.value = {}
+    isSubmitting.value = true
+
     const formData = new FormData()
 
     if (selectedAreaId.value) {
@@ -191,20 +199,44 @@ export function useEmitirTramite() {
     }
 
     try {
-      isSubmitting.value = true
+      // Si la petición tiene éxito (código 201)...
       await apiClient.post('/documentos', formData)
-      toast.success('Éxito', { description: 'El documento ha sido creado y enviado.' })
+
+      toast.success('Éxito', { description: 'El trámite ha sido generado correctamente.' })
       isModalOpen.value = false
       resetForm()
       await fetchDocumentos()
     } catch (error) {
-      console.error('Error al crear el documento:', error)
-      let errorMsg = 'Ocurrió un error desconocido.'
+      // Si la petición falla...
       if (axios.isAxiosError(error) && error.response) {
-        errorMsg = error.response.data.message || 'Error del servidor.'
+        // Usamos un switch para ver qué código de error nos dio el backend
+        switch (error.response.status) {
+          case 422: // Error de Validación
+            // Guardamos los errores en nuestro "contenedor"
+            validationErrors.value = error.response.data.errors
+            toast.error('Validación fallida', {
+              description: 'Por favor, corrige los errores en el formulario.',
+            })
+            break
+          case 403: // Error de Permisos
+            toast.error('Acceso Denegado', {
+              description: 'No tienes permiso para realizar esta acción.',
+            })
+            break
+          case 500: // Error del Servidor
+          default: // Cualquier otro error del servidor
+            toast.error('Error del Servidor', {
+              description: 'Ocurrió un error inesperado. Por favor, intente de nuevo.',
+            })
+        }
+      } else {
+        // Si el error no es de la API (ej. no hay internet)
+        toast.error('Error de Conexión', {
+          description: 'No se pudo conectar con el servidor.',
+        })
       }
-      toast.error('Error', { description: `No se pudo crear el documento: ${errorMsg}` })
     } finally {
+      // Esto se ejecuta siempre, al final del try o del catch
       isSubmitting.value = false
     }
   }
@@ -269,31 +301,49 @@ export function useEmitirTramite() {
 
   watch(pagination, fetchDocumentos, { deep: true })
 
-  watch(isModalOpen, async (newValue) => {
+  watch(isModalOpen, (newValue) => {
+    // Si el modal se está abriendo...
     if (newValue === true) {
-      if (!selectedAreaId.value) {
-        toast.error('Error', {
-          description: 'Debe seleccionar una oficina antes de emitir un trámite.',
-        })
-        isModalOpen.value = false
-        return
-      }
+      // 1. Reseteamos el número de documento anterior
+      newDoc.value.nro_documento = ''
 
-      isNumeroLoading.value = true
-      try {
-        const response = await apiClient.get(
-          `/documentos/siguiente-correlativo/${selectedAreaId.value}`,
-        )
-        newDoc.value.nro_documento = response.data.siguiente_numero
-      } catch (error) {
-        console.error('Error al obtener el correlativo:', error)
-        toast.error('Error', { description: 'No se pudo obtener el número de documento.' })
-        newDoc.value.nro_documento = 'Error'
-      } finally {
-        isNumeroLoading.value = false
+      // 2. Verificamos que se haya seleccionado una oficina de origen
+      if (!selectedAreaId.value) {
+        toast.error('Acción requerida', {
+          description: 'Debe seleccionar una oficina de origen antes de emitir un trámite.',
+        })
+        isModalOpen.value = false // Cerramos el modal si no hay oficina
       }
     }
   })
+
+  watch(
+    () => newDoc.value.tipo_documento_id,
+    async (newTipoDocId) => {
+      // Si el usuario ha seleccionado un tipo de documento (y no lo ha des-seleccionado)
+      if (newTipoDocId && selectedAreaId.value) {
+        isNumeroLoading.value = true
+        newDoc.value.nro_documento = 'Cargando...' // Feedback para el usuario
+
+        try {
+          // Llamamos al NUEVO endpoint con ambos IDs
+          const response = await apiClient.get(
+            `/documentos/siguiente-correlativo/${selectedAreaId.value}/${newTipoDocId}`,
+          )
+          // Poblamos el campo con la respuesta
+          newDoc.value.nro_documento = response.data.siguiente_numero
+        } catch (error) {
+          console.error('Error al obtener el correlativo:', error)
+          toast.error('Error de Correlativo', {
+            description: 'No se pudo obtener el número de documento para este tipo.',
+          })
+          newDoc.value.nro_documento = 'Error' // Indicamos el fallo
+        } finally {
+          isNumeroLoading.value = false
+        }
+      }
+    },
+  )
 
   // --- Inicialización (Watcher para área por defecto) ---
   watch(
@@ -326,6 +376,7 @@ export function useEmitirTramite() {
     newDoc,
     handleFileChange,
     resetForm,
+    validationErrors,
     handleCreateDocument,
     isSeguimientoModalOpen,
     selectedDocHistory,
